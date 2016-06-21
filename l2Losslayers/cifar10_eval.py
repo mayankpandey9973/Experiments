@@ -125,7 +125,7 @@ def evaluate():
     # Build a Graph that computes the logits predictions from the
     # inference model.
     logits = cifar10.inference(images, 3, use_batchnorm=True, 
-        use_nrelu=False, id_decay=False, add_shortcuts=True is_train=False)
+        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=False)
 
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)
