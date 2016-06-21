@@ -54,7 +54,7 @@ FLAGS = tf.app.flags.FLAGS
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar10_data',
+tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar10_dataL2',
                            """Path to the CIFAR-10 data directory.""")
 
 # Global constants describing the CIFAR-10 data set.
@@ -339,6 +339,11 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
     _activation_summary(res)
   return res
 
+def grpLoss(grp_id, scale):
+    mu0 = tf.reduce_mean(tf.get_collection('wts0', 'grp' + str(grp_id)), 0)
+    mu1 = tf.reduce_mean(tf.get_collection('wts1', 'grp' + str(grp_id)), 0)
+    return scale * (tf.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1) + tf.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1))
+
 def batchnorm(input, suffix, is_train):
   rank = len(input.get_shape().as_list())
   in_dim = input.get_shape().as_list()[-1]
@@ -403,14 +408,14 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
       input = tf.nn.relu(input)
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
-
   wt_name = 'weights_1_' + str(suffix)
   if id_decay:
     kernel_[0] = _variable_with_id_decay(wt_name, shape=shape,
                                      stddev=1e-4, wd=weight_decay)
   else:
     kernel_[0] = _variable_with_weight_decay(wt_name, shape=shape,
-                                         stddev=1e-4, wd=weight_decay)
+                                         stdden=1e-4, wd=weight_decay)
+  tf.add_to_collection('wts0', kernel_[0])
   conv = tf.nn.conv2d(input, kernel_[0], [1, 1, 1, 1], padding='SAME')
   # b_name = 'biases_1_' + str(suffix)
   # biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
@@ -436,6 +441,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
                                            stddev=1e-4, wd=weight_decay)
   
   conv = tf.nn.conv2d(input, kernel_[1], [1, 1, 1, 1], padding='SAME')
+  tf.add_to_collection('wts1', kernel_[1])
   # b_name = 'biases_2_' + str(suffix)
   # biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
   # bias = tf.nn.bias_add(conv, biases)
@@ -498,6 +504,9 @@ def loss(logits, labels):
       logits, labels, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
   tf.add_to_collection('losses', cross_entropy_mean)
+  tf.add_to_collection('losses', grpLoss(1, 0.01))
+  tf.add_to_collection('losses', grpLoss(2, 0.01))
+  tf.add_to_collection('losses', grpLoss(3, 0.01))
 
   # The total loss is defined as the cross entropy loss plus all of the weight
   # decay terms (L2 loss).
