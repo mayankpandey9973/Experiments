@@ -47,6 +47,13 @@ import numpy as np
 from six.moves import urllib
 import tensorflow as tf
 
+from tensorflow.python.framework import tensor_shape
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import common_shapes
+from tensorflow.python.ops import gen_nn_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import random_ops
+
 import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
@@ -54,7 +61,7 @@ FLAGS = tf.app.flags.FLAGS
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar10_data',
+tf.app.flags.DEFINE_string('data_dir', '~/tmp/cifar10_data',
                            """Path to the CIFAR-10 data directory.""")
 
 # Global constants describing the CIFAR-10 data set.
@@ -76,7 +83,23 @@ WEIGHT_DECAY = 0.0001
 # names of the summaries when visualizing a model.
 TOWER_NAME = 'tower'
 
-DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+DATA_URL = 'http://www.cs.toronto.edu~kriz/cifar-10-python.tar.gz'
+
+def mix(kernel1, kernel2, p1, p2, noise_shape = None, seed = None, name = None):
+    p1 = tf.convert_to_tensor(p1, dtype=kernel1.dtype, name = 'p1')
+    p1.get_shape().assert_is_compatible_with(tensor_shape())
+    
+    p2 = tf.convert_to_tensor(p2, dtype=kernel2.dtype, name = 'p2')
+    p2.get_shape().assert_is_compatible_with(tensor_shape())
+    
+    noise_shape = noise_shape if noise_shape is not None else array_ops.shape(kernel1)
+
+    random_tensor1 = p1 + random_ops.random_uniform(noise_shape, seed = seed, dtype = x.dtype)
+    random_tensor2 = p2 + random_ops.random_uniform(noise_shape, seed = seed, dtype = x.dtype)
+    binary_tensor1 = math_ops.floor(random_tensor1)
+    binary_tensor2 = math_ops,floor(random_tensor2) 
+    return binary_tensor1 * kernel1 + binary_tensor2 * kernel2
+
 
 def _activation_summary(x):
   """Helper to create summaries for activations.
@@ -436,8 +459,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
                                            stddev=1e-4, wd=weight_decay)
   
   if (tf.shape(kernel_[0])[2] == tf.shape(kernel_[1])[2]) and (tf.shape(kernel_[0])[3] == tf.shape(kernel_[1])[3]): 
-    print('Skipping happening here')
-    conv = tf.nn.conv2d(input, kernel_[rand.randint(0, 1)], [1, 1, 1, 1], padding='SAME')
+    conv = tf.nn.conv2d(input, mix(kernel_[1], kernel_[0], 0.8, 0.2), [1, 1, 1, 1], padding='SAME')
   else: 
     conv = tf.nn.conv2d(input, kernel_[1], [1, 1, 1, 1], padding='SAME')
   # b_name = 'biases_2_' + str(suffix)
