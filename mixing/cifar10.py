@@ -55,13 +55,13 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import random_ops
 
 import cifar10_input
-
+HOME = os.getenv("HOME")
 FLAGS = tf.app.flags.FLAGS
 
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_string('data_dir', '~/tmp/cifar10_data',
+tf.app.flags.DEFINE_string('data_dir', HOME + '/tmp/cifar10_data',
                            """Path to the CIFAR-10 data directory.""")
 
 # Global constants describing the CIFAR-10 data set.

@@ -49,8 +49,9 @@ import cifar10
 
 FLAGS = tf.app.flags.FLAGS
 
+HOME = os.getenv("HOME")
 tf.app.flags.DEFINE_string('train_dir',
-	'~/tfRuns/outputs/mixing/train',
+	HOME + '/tfRuns/outputs/mixing/train',
                            """Directory where to write event logs """
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_epochs', 64*2+32,

@@ -43,13 +43,14 @@ import tensorflow as tf
 
 import cifar10
 
+HOME = os.getenv("HOME")
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('eval_dir', '~/tfRuns/outputs/mixing/eval',
+tf.app.flags.DEFINE_string('eval_dir', HOME + '/tfRuns/outputs/mixing/eval',
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '~/tfRuns/outputs/mixing/train',
+tf.app.flags.DEFINE_string('checkpoint_dir', HOME + '/tfRuns/outputs/mixing/train',
                            """Directory where to read model checkpoints.""")
 tf.app.flags.DEFINE_integer('eval_interval_secs', 60 * 5,
                             """How often to run the eval.""")
