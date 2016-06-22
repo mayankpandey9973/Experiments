@@ -1,7 +1,6 @@
-Running
-=======
+Results: 
 
-Set the env variable to mask unwanted gpus.
+After 55000 batches: ~88-89% accuracy (no learning rate decay yet)
 
-export CUDA_VISIBLE_DEVICES=1
+
 
