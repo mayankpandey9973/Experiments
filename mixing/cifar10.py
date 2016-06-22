@@ -83,7 +83,7 @@ WEIGHT_DECAY = 0.0001
 # names of the summaries when visualizing a model.
 TOWER_NAME = 'tower'
 
-DATA_URL = 'http://www.cs.toronto.edu~kriz/cifar-10-python.tar.gz'
+DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
 def mix(kernel1, kernel2, p1, p2, noise_shape = None, seed = None, name = None):
     p1 = tf.convert_to_tensor(p1, dtype=kernel1.dtype, name = 'p1')
