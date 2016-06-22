@@ -71,6 +71,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
   """
 
   gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
