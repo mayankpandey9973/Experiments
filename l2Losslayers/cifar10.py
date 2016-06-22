@@ -342,7 +342,8 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
 def grpLoss(grp_id, scale):
     mu0 = tf.reduce_mean(tf.get_collection('wts0', 'grp' + str(grp_id)), 0)
     mu1 = tf.reduce_mean(tf.get_collection('wts1', 'grp' + str(grp_id)), 0)
-    return scale * (tf.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1) + tf.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1))
+    return scale * (tf.nn.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1) + 
+	    tf.nn.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1))
 
 def batchnorm(input, suffix, is_train):
   rank = len(input.get_shape().as_list())
@@ -414,8 +415,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
                                      stddev=1e-4, wd=weight_decay)
   else:
     kernel_[0] = _variable_with_weight_decay(wt_name, shape=shape,
-                                         stdden=1e-4, wd=weight_decay)
-  tf.add_to_collection('wts0', kernel_[0])
+                                         stddev=1e-4, wd=weight_decay)
+  if shape[2] == shape[3]: 
+    tf.add_to_collection('wts0', kernel_[0])
   conv = tf.nn.conv2d(input, kernel_[0], [1, 1, 1, 1], padding='SAME')
   # b_name = 'biases_1_' + str(suffix)
   # biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
