@@ -1,7 +1,4 @@
-Running
-=======
+Results: 
 
-Set the env variable to mask unwanted gpus.
-
-export CUDA_VISIBLE_DEVICES=1
+After 55000 batches: % accuracy
 
