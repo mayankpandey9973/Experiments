@@ -70,7 +70,7 @@ NUM_EPOCHS_PER_DECAY = 128.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
-PROB_SKIP = 0.5
+PROB_KEEP = 0.8
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
@@ -436,7 +436,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
                                            stddev=1e-4, wd=weight_decay)
 #check if shapes work out
   if (tf.shape(kernel_[0])[2] == tf.shape(kernel_[1])[2]) and (tf.shape(kernel_[0])[3] == tf.shape(kernel_[1])[3]): 
-    conv = tf.nn.conv2d(input, kernel_[math.floor(rand.random() + PROB_SKIP)], [1, 1, 1, 1], padding='SAME')
+    conv = tf.nn.conv2d(input, kernel_[math.floor(rand.random() + PROB_KEEP)], [1, 1, 1, 1], padding='SAME')
   else: 
     conv = tf.nn.conv2d(input, kernel_[1], [1, 1, 1, 1], padding='SAME')
   # b_name = 'biases_2_' + str(suffix)
