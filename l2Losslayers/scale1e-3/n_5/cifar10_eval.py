@@ -45,11 +45,11 @@ import cifar10
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/skipping/eval',
+tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/eval-' + str(cifar10.SCALE) + '_n_5',
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '/home/mayankp/tfRuns/outputs/skipping/train',
+tf.app.flags.DEFINE_string('checkpoint_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/trainL2-' + str(cifar10.SCALE) + '_n_5', 
                            """Directory where to read model checkpoints.""")
 tf.app.flags.DEFINE_integer('eval_interval_secs', 60 * 5,
                             """How often to run the eval.""")
@@ -69,7 +69,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
     summary_op: Summary op.
   """
 
-  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
@@ -124,8 +124,8 @@ def evaluate():
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    logits = cifar10.inference(images, 3, use_batchnorm=True, 
-        use_nrelu=False, id_decay=False, add_shortcuts=False, is_train=False)
+    logits = cifar10.inference(images, 5, use_batchnorm=True, 
+        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=False)
 
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)

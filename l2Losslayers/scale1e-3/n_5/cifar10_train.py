@@ -50,10 +50,10 @@ import cifar10
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('train_dir',
-	'/home/mayankp/tfRuns/outputs/skipping/train',
+	'/home/mayankp/tfRuns/outputs/normalized_relu/tmp/trainL2-' + str(cifar10.SCALE) + '_n_5',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-tf.app.flags.DEFINE_integer('max_epochs', 64*2+32,
+tf.app.flags.DEFINE_integer('max_epochs', 64*2+32 + 1,
                             """Number of epochs to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
@@ -77,8 +77,8 @@ def train():
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    logits = cifar10.inference(images, 3, use_batchnorm=True,
-        use_nrelu=False, id_decay=False, add_shortcuts=False, is_train=True)
+    logits = cifar10.inference(images, 5, use_batchnorm=True,
+        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=True)
 
     # Calculate loss.
     loss = cifar10.loss(logits, labels)
