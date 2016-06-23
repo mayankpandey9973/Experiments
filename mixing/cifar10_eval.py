@@ -69,7 +69,6 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
     top_k_op: Top K op.
     summary_op: Summary op.
   """
-
   gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
 
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
