@@ -507,9 +507,9 @@ def loss(logits, labels):
       logits, labels, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
   tf.add_to_collection('losses', cross_entropy_mean)
-  tf.add_to_collection('losses', grpLoss(1, 0.01))
-  tf.add_to_collection('losses', grpLoss(2, 0.01))
-  tf.add_to_collection('losses', grpLoss(3, 0.01))
+  tf.add_to_collection('losses', grpLoss(1, SCALE))
+  tf.add_to_collection('losses', grpLoss(2, SCALE))
+  tf.add_to_collection('losses', grpLoss(3, SCALE))
 
   # The total loss is defined as the cross entropy loss plus all of the weight
   # decay terms (L2 loss).
