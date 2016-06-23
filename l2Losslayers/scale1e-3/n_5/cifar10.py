@@ -295,13 +295,14 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     
     relu_bias = 0.399
     relu_std = 0.584
-    if use_nrelu:
-      groups_out = (tf.nn.relu(res3) - relu_bias) / relu_std
-    else:
-      groups_out = tf.nn.relu(res3)
     # Add bnorm and relu after the last grp.
+    groups_out = res3
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
+    if use_nrelu:
+      groups_out = (tf.nn.relu(groups_out) - relu_bias) / relu_std
+    else:
+      groups_out = tf.nn.relu(groups_out)
     
     kernel = _variable_with_weight_decay('weights',
         shape=[1, 1, group_shapes[3], NUM_CLASSES], stddev=1e-4, 
@@ -360,10 +361,10 @@ def batchnorm(input, suffix, is_train):
   mean, variance = tf.nn.moments(input, axes)
   offset = _variable_on_cpu('offset_' + str(suffix), in_dim,
       tf.constant_initializer(0.0))
-  # scale = _variable_on_cpu('scale_' + str(suffix), in_dim, 
-      # tf.constant_initializer(1.0))
+  scale = _variable_on_cpu('scale_' + str(suffix), in_dim, 
+    tf.constant_initializer(1.0))
   # offset = 0.0
-  scale = 1.0
+  #scale = 1.0
   
   decay = 0.95
   epsilon = 1e-4
@@ -404,12 +405,12 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     shortcut = tf.nn.conv2d(shortcut, kernel, [1, 1, 1, 1], padding='SAME')
 
   if not first:
+    if use_batchnorm:
+      input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
       input = (tf.nn.relu(input) - relu_bias) / relu_std
     else:
       input = tf.nn.relu(input)
-    if use_batchnorm:
-      input = batchnorm(input, '1_' + str(suffix), is_train)
   wt_name = 'weights_1_' + str(suffix)
   if id_decay:
     kernel_[0] = _variable_with_id_decay(wt_name, shape=shape,
@@ -420,18 +421,18 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   if shape[2] == shape[3]: 
     tf.add_to_collection('wts0', kernel_[0])
   conv = tf.nn.conv2d(input, kernel_[0], [1, 1, 1, 1], padding='SAME')
-  # b_name = 'biases_1_' + str(suffix)
-  # biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
-  # bias = tf.nn.bias_add(conv, biases)
-  bias = conv
+  b_name = 'biases_1_' + str(suffix)
+  biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
+  bias = tf.nn.bias_add(conv, biases)
+  #bias = conv
 
+  # Do batch norm as well
+  if use_batchnorm:
+    input = batchnorm(input, '2_' + str(suffix), is_train)
   if use_nrelu:
     input = (tf.nn.relu(bias) - relu_bias) / relu_std
   else:
     input = tf.nn.relu(bias)
-  # Do batch norm as well
-  if use_batchnorm:
-    input = batchnorm(input, '2_' + str(suffix), is_train)
   
   # Upsampling (if needed) happens in the first conv block above.
   shape[2] = shape[3]
@@ -445,10 +446,10 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   
   conv = tf.nn.conv2d(input, kernel_[1], [1, 1, 1, 1], padding='SAME')
   tf.add_to_collection('wts1', kernel_[1])
-  # b_name = 'biases_2_' + str(suffix)
-  # biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
-  # bias = tf.nn.bias_add(conv, biases)
-  bias = conv
+  b_name = 'biases_2_' + str(suffix)
+  biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
+  bias = tf.nn.bias_add(conv, biases)
+  #bias = conv
 
   if False:
     return 0
@@ -471,21 +472,21 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
     kernel = _variable_with_weight_decay(wt_name, shape=shape,
                                          stddev=1e-4, wd=weight_decay)
   conv = tf.nn.conv2d(input, kernel, [1, 1, 1, 1], padding='SAME')
-  # b_name = 'biases' + str(suffix)
-  # biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
-  # bias = tf.nn.bias_add(conv, biases)
-  bias = conv
+  b_name = 'biases' + str(suffix)
+  biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
+  bias = tf.nn.bias_add(conv, biases)
+  #bias = conv
 
   relu_bias = 0.399
   relu_std = 0.584
 
-  if use_nrelu:
-    conv1 = (tf.nn.relu(bias) - relu_bias) / relu_std
-  else:
-    conv1 = tf.nn.relu(bias)
-
+  conv1 = bias
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
+  if use_nrelu:
+    conv1 = (tf.nn.relu(conv1) - relu_bias) / relu_std
+  else:
+    conv1 = tf.nn.relu(conv1)
 
   return conv1
 
