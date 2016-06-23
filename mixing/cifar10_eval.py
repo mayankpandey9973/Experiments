@@ -37,6 +37,7 @@ from __future__ import print_function
 from datetime import datetime
 import math
 import time
+import os
 
 import numpy as np
 import tensorflow as tf
