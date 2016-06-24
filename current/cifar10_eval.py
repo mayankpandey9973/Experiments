@@ -46,11 +46,11 @@ import cifar10
 n = 5
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/eval-' + str(cifar10.SCALE) + '_n_' + str(n),
+tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/eval-' + str(cifar10.SCALE) + '_n_' + str(n) + '_1mean',
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/trainL2-' + str(cifar10.SCALE) + '_n_' + str(n), 
+tf.app.flags.DEFINE_string('checkpoint_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/trainL2-' + str(cifar10.SCALE) + '_n_' + str(n) + '_1mean', 
                            """Directory where to read model checkpoints.""")
 tf.app.flags.DEFINE_integer('eval_interval_secs', 60 * 5,
                             """How often to run the eval.""")

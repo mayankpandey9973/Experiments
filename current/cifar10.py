@@ -55,7 +55,7 @@ SCALE = 0.001
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar10_dataL2-' + str(SCALE),
+tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar10_data',
                            """Path to the CIFAR-10 data directory.""")
 
 # Global constants describing the CIFAR-10 data set.
@@ -342,10 +342,8 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
   return res
 
 def grpLoss(grp_id, scale):
-    mu0 = tf.reduce_mean(tf.get_collection('wts0', 'grp' + str(grp_id)), 0)
-    mu1 = tf.reduce_mean(tf.get_collection('wts1', 'grp' + str(grp_id)), 0)
-    return scale * (tf.nn.l2_loss(tf.get_collection('wts0', 'grp' + str(grp_id)) - mu0) + 
-	    tf.nn.l2_loss(tf.get_collection('wts1', 'grp' + str(grp_id)) - mu1))
+    mu = tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)
+    return scale * tf.nn.l2_loss(tf.get_collection('wts', 'grp' + str(grp_id)) - mu)
 
 def batchnorm(input, suffix, is_train):
   rank = len(input.get_shape().as_list())
@@ -419,7 +417,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     kernel_[0] = _variable_with_weight_decay(wt_name, shape=shape,
                                          stddev=1e-4, wd=weight_decay)
   if shape[2] == shape[3]: 
-    tf.add_to_collection('wts0', kernel_[0])
+    tf.add_to_collection('wts', kernel_[0])
   conv = tf.nn.conv2d(input, kernel_[0], [1, 1, 1, 1], padding='SAME')
   b_name = 'biases_1_' + str(suffix)
   biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
@@ -445,7 +443,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
                                            stddev=1e-4, wd=weight_decay)
   
   conv = tf.nn.conv2d(input, kernel_[1], [1, 1, 1, 1], padding='SAME')
-  tf.add_to_collection('wts1', kernel_[1])
+  tf.add_to_collection('wts', kernel_[1])
   b_name = 'biases_2_' + str(suffix)
   biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
   bias = tf.nn.bias_add(conv, biases)
