@@ -51,7 +51,7 @@ import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
-SCALE = 0.001
+SCALE = 1e-4
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
