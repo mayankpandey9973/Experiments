@@ -51,7 +51,7 @@ n = 5
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('train_dir',
-	'/home/mayankp/tfRuns/outputs/normalized_relu/tmp/trainL2-' + str(cifar10.SCALE) + '_n_5_1meanIdFilter',
+	'/home/mayankp/tfRuns/outputs/normalized_relu/tmp/trainL2-' + str(cifar10.SCALE) + cifar10.projName,
                            """Directory where to write event logs """
                            """and checkpoint.""")
 tf.app.flags.DEFINE_integer('max_epochs', 64*2+32 + 1,

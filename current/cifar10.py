@@ -52,6 +52,7 @@ import cifar10_input
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.001
+projName = 'grpMeanSqrt'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -342,7 +343,8 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
 
 def grpLoss(grp_id, scale):
   mu = tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)
-  return scale * tf.nn.l2_loss(tf.get_collection('wts', 'grp' + str(grp_id)) - mu)
+  shape = tf.shape(mu)
+  return scale * tf.nn.l2_loss(tf.ones(shape) / sqrt(shape[0] * shape[1] * shape[2]) - mu)
 
 def batchnorm(input, suffix, is_train):
   rank = len(input.get_shape().as_list())
