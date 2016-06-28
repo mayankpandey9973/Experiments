@@ -51,7 +51,7 @@ import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
-SCALE = 0.001
+SCALE = 0.01
 projName = 'grpMeanSqrt'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
