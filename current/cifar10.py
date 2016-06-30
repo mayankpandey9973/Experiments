@@ -347,7 +347,7 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
 
 def grpLoss(grp_id, scale):
   mu = tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)
-  return scale * tf.nn.l2_loss(tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)- mu)
+  return scale * tf.nn.l2_loss(tf.get_collection('wts', 'grp' + str(grp_id), 0) - mu)
 
 
 def batchnorm(input, suffix, is_train):
