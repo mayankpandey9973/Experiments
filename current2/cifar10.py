@@ -51,7 +51,7 @@ import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
-SCALE = 0.1
+SCALE = 1e-6
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -72,7 +72,6 @@ LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
 group_shapes = [32, 32, 64, 128]
-
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
@@ -348,7 +347,7 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
 
 def grpLoss(grp_id, scale):
   mu = tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)
-  return scale * tf.nn.l2_loss(create_sqrt_filter([3, 3, group_shapes[grp_id], group_shapes[grp_id]]) - mu)
+  return scale * tf.nn.l2_loss(tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)- mu)
 
 
 def batchnorm(input, suffix, is_train):
