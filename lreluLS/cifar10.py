@@ -47,11 +47,19 @@ import numpy as np
 from six.moves import urllib
 import tensorflow as tf
 
+from tensorflow.python.framework import tensor_shape
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import common_shapes
+from tensorflow.python.ops import gen_nn_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import random_ops
+
 import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
-SCALE = 1e-6
+SCALE = 0.0 #not relevant here
+name = 'reluDecayLinearRand'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -72,12 +80,20 @@ LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
 group_shapes = [32, 32, 64, 128]
+curReluDecay = 1.0
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
 TOWER_NAME = 'tower'
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+
+def modifiedRelu(x):
+    P_1 = tf.convert_to_tensor(curReluDecay, dtype = x.dtype, name = 'P_1')
+    random_tensor1 = P_1 + random_ops.random_uniform(array_ops.shape(x), seed = None, dtype = x.dtype)
+    random_tensor1 = math_ops.floor(random_tensor1)
+
+    return random_tensor1 * x + (1. - random_tensor1) * tf.nn.relu(x)
 
 def _activation_summary(x):
   """Helper to create summaries for activations.
@@ -304,9 +320,9 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
     if use_nrelu:
-      groups_out = (tf.nn.relu(groups_out) - relu_bias) / relu_std
+      groups_out = (modifiedRelu(groups_out) - relu_bias) / relu_std
     else:
-      groups_out = tf.nn.relu(groups_out)
+      groups_out = modifiedRelu(groups_out)
     
     kernel = _variable_with_weight_decay('weights',
         shape=[1, 1, group_shapes[3], NUM_CLASSES], stddev=1e-4, 
@@ -411,9 +427,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
-      input = (tf.nn.relu(input) - relu_bias) / relu_std
+      input = (modifiedRelu(input) - relu_bias) / relu_std
     else:
-      input = tf.nn.relu(input)
+      input = modifiedRelu(input)
   wt_name = 'weights_1_' + str(suffix)
   if id_decay:
     kernel_[0] = _variable_with_id_decay(wt_name, shape=shape,
@@ -433,9 +449,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   if use_batchnorm:
     input = batchnorm(input, '2_' + str(suffix), is_train)
   if use_nrelu:
-    input = (tf.nn.relu(bias) - relu_bias) / relu_std
+    input = (modifiedRelu(bias) - relu_bias) / relu_std
   else:
-    input = tf.nn.relu(bias)
+    input = modifiedRelu(bias)
   
   # Upsampling (if needed) happens in the first conv block above.
   shape[2] = shape[3]
@@ -487,9 +503,9 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
   if use_nrelu:
-    conv1 = (tf.nn.relu(conv1) - relu_bias) / relu_std
+    conv1 = (modifiedRelu(conv1) - relu_bias) / relu_std
   else:
-    conv1 = tf.nn.relu(conv1)
+    conv1 = modifiedRelu(conv1)
 
   return conv1
 
@@ -560,6 +576,7 @@ def train(total_loss, global_step):
   Returns:
     train_op: op for training.
   """
+  global curReluDecay
   # Variables that affect learning rate.
   num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
   decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
@@ -571,7 +588,11 @@ def train(total_loss, global_step):
                                   decay_steps,
                                   LEARNING_RATE_DECAY_FACTOR,
                                   staircase=True)
+  
+  curReluDecay = tf.nn.relu(tf.to_float(50000 - global_step)/50000.)
   tf.scalar_summary('learning_rate', lr)
+  tf.scalar_summary('relu_decay', curReluDecay)
+  tf.scalar_summary('reluVal', modifiedRelu(tf.constant(-1.0)))
 
   # Generate moving averages of all losses and associated summaries.
   loss_averages_op = _add_loss_summaries(total_loss)
