@@ -71,6 +71,7 @@ def train():
     inputs = cifar10.ram_inputs(unit_variance=True, is_train=True)
     images = inputs['images']
     labels = inputs['labels']
+    relu_decay = tf.placeholder(tf.float32, shape = ())
 
     # Batch generator
     batcher = cifar10.Cifar10BatchGenerator(
@@ -80,7 +81,7 @@ def train():
     # Build a Graph that computes the logits predictions from the
     # inference model.
     logits = cifar10.inference(images, n, use_batchnorm=True,
-        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=True)
+        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=True, relu_decay=relu_decay)
 
     # Calculate loss.
     loss = cifar10.loss(logits, labels)
@@ -113,6 +114,7 @@ def train():
     summary_writer = tf.train.SummaryWriter(FLAGS.train_dir, sess.graph)
 
     step = -1
+    curReluDecay = float(50000 - step)/50000.
     while not batcher.is_done():
       step += 1
 
@@ -120,6 +122,7 @@ def train():
       feed_dict = {
           inputs['images_pl']: batch_im,
           inputs['labels_pl']: batch_labs,
+	  relu_decay: curReluDecay,
         }
 
       start_time = time.time()

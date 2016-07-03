@@ -73,7 +73,7 @@ LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
 group_shapes = [32, 32, 64, 128]
-curReluDecay = 1.0
+curReluDecay = tf.ones(())
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
@@ -81,8 +81,8 @@ TOWER_NAME = 'tower'
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
-def modifiedRelu(x):
-    return curReluDecay * x + (1 - curReluDecay) * tf.nn.relu(x)
+def modifiedRelu(x, decay):
+    return decay * x + (1 - decay) * tf.nn.relu(x)
 
 def _activation_summary(x):
   """Helper to create summaries for activations.
@@ -255,7 +255,7 @@ def ram_inputs(unit_variance, is_train):
       unit_variance=unit_variance, is_train=is_train)
 
 def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
-    is_train):
+    is_train, relu_decay):
   """Build the CIFAR-10 model.
 
   Args:
@@ -272,16 +272,17 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
 
   # Weight decay
   weight_decay = WEIGHT_DECAY
-
+  tf.scalar_summary('relu_decay', relu_decay)
+#relu_decay = tf.placeholder(tf.float32, shape = ())
   # Initial conv block
   with tf.variable_scope('conv0') as scope:
     conv0  = convblock(images, [3, 3, 3, group_shapes[0]], 0, weight_decay,
-      use_batchnorm, use_nrelu, id_decay, is_train)
+      use_batchnorm, use_nrelu, id_decay, is_train, relu_decay)
     _activation_summary(conv0)
   
   # grp1
   res1 = addgroup(1, conv0, group_shapes, weight_decay, is_train, n, True,
-      use_batchnorm, use_nrelu, id_decay, add_shortcuts)
+      use_batchnorm, use_nrelu, id_decay, add_shortcuts, relu_decay)
 
   # pool1
   pool1 = tf.nn.avg_pool(res1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1],
@@ -289,7 +290,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
   
   # grp2
   res2 = addgroup(2, pool1, group_shapes, weight_decay, is_train, n, False,
-      use_batchnorm, use_nrelu, id_decay, add_shortcuts)
+      use_batchnorm, use_nrelu, id_decay, add_shortcuts, relu_decay)
 
   # pool2
   pool2 = tf.nn.avg_pool(res2, ksize=[1, 2, 2, 1],
@@ -297,7 +298,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
 
   # grp3
   res3 = addgroup(3, pool2, group_shapes, weight_decay, is_train, n, False,
-      use_batchnorm, use_nrelu, id_decay, add_shortcuts)
+      use_batchnorm, use_nrelu, id_decay, add_shortcuts, relu_decay)
 
   # logit
   with tf.variable_scope('softmax_linear') as scope:
@@ -309,9 +310,9 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
     if use_nrelu:
-      groups_out = (modifiedRelu(groups_out) - relu_bias) / relu_std
+      groups_out = (modifiedRelu(groups_out, relu_decay) - relu_bias) / relu_std
     else:
-      groups_out = modifiedRelu(groups_out)
+      groups_out = modifiedRelu(groups_out, relu_decay)
     
     kernel = _variable_with_weight_decay('weights',
         shape=[1, 1, group_shapes[3], NUM_CLASSES], stddev=1e-4, 
@@ -331,7 +332,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
   return softmax_linear
 
 def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
-    is_first_group, use_batchnorm, use_nrelu, id_decay, add_shortcuts):
+    is_first_group, use_batchnorm, use_nrelu, id_decay, add_shortcuts, cur_relu_decay):
   
   with tf.variable_scope('grp'+str(grp_id)):
     res = input
@@ -346,7 +347,7 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
 
       with tf.variable_scope('res'+str(k)) as scope:
         res  = residualblock(res, shape, k, dont_add_relu, weight_decay,
-            use_batchnorm, use_nrelu, id_decay, add_shortcuts, is_train)
+            use_batchnorm, use_nrelu, id_decay, add_shortcuts, is_train, cur_relu_decay)
     _activation_summary(res)
   return res
 
@@ -392,7 +393,7 @@ def batchnorm(input, suffix, is_train):
           input, ema_mean, ema_var, offset, scale, epsilon)
 
 def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
-    use_nrelu, id_decay, add_shortcuts, is_train):
+    use_nrelu, id_decay, add_shortcuts, is_train, cur_relu_decay):
   # Do the projection as well.
 
   relu_bias = 0.399
@@ -416,9 +417,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
-      input = (modifiedRelu(input) - relu_bias) / relu_std
+      input = (modifiedRelu(input, cur_relu_decay) - relu_bias) / relu_std
     else:
-      input = modifiedRelu(input)
+      input = modifiedRelu(input, cur_relu_decay)
   wt_name = 'weights_1_' + str(suffix)
   if id_decay:
     kernel_[0] = _variable_with_id_decay(wt_name, shape=shape,
@@ -438,9 +439,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   if use_batchnorm:
     input = batchnorm(input, '2_' + str(suffix), is_train)
   if use_nrelu:
-    input = (modifiedRelu(bias) - relu_bias) / relu_std
+    input = (modifiedRelu(bias, cur_relu_decay) - relu_bias) / relu_std
   else:
-    input = modifiedRelu(bias)
+    input = modifiedRelu(bias, cur_relu_decay)
   
   # Upsampling (if needed) happens in the first conv block above.
   shape[2] = shape[3]
@@ -471,7 +472,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   return res
 
 def convblock(input, shape, suffix, weight_decay, use_batchnorm, 
-    use_nrelu, id_decay, is_train):
+    use_nrelu, id_decay, is_train, cur_relu_decay):
   wt_name = 'weights' + str(suffix)
   if id_decay:
     kernel = _variable_with_id_decay(wt_name, shape=shape,
@@ -492,9 +493,9 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
   if use_nrelu:
-    conv1 = (modifiedRelu(conv1) - relu_bias) / relu_std
+    conv1 = (modifiedRelu(conv1, cur_relu_decay) - relu_bias) / relu_std
   else:
-    conv1 = modifiedRelu(conv1)
+    conv1 = modifiedRelu(conv1, cur_relu_decay)
 
   return conv1
 
@@ -580,8 +581,7 @@ def train(total_loss, global_step):
   
   curReluDecay = tf.nn.relu(tf.to_float(50000 - global_step)/50000.)
   tf.scalar_summary('learning_rate', lr)
-  tf.scalar_summary('relu_decay', curReluDecay)
-  tf.scalar_summary('reluVal', modifiedRelu(-1.0))
+#tf.scalar_summary('reluVal', modifiedRelu(-1.0))
 
   # Generate moving averages of all losses and associated summaries.
   loss_averages_op = _add_loss_summaries(total_loss)
