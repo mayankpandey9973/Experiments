@@ -37,7 +37,7 @@ from __future__ import print_function
 from datetime import datetime
 import math
 import time
-
+import re
 import numpy as np
 import tensorflow as tf
 
@@ -59,6 +59,9 @@ tf.app.flags.DEFINE_integer('num_examples', 10000,
 tf.app.flags.DEFINE_boolean('run_once', False,
                          """Whether to run eval only once.""")
 
+def end_num(s):
+    m = re.search(r'\d+$', s)
+    return int(m.group())
 
 def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
   """Run Eval once.
@@ -70,6 +73,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
     summary_op: Summary op.
   """
 
+  relu_decay = tf.placeholder(tf.float32, shape = ())
   gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
@@ -80,11 +84,11 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
       #   /my-favorite-path/cifar10_train/model.ckpt-0,
       # extract global_step from it.
       global_step = ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1]
+      step_num = end_num(ckpt.model_checkpoint_path) 
       print('Using the checkpoint %s' % (ckpt.model_checkpoint_path))
     else:
       print('No checkpoint file found')
       return
-
     # Batch generator
     batcher = cifar10.Cifar10BatchGenerator(
         inputs['data_images'], inputs['data_labels'], is_train=False,
@@ -94,10 +98,13 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
     
     step = 0
     while not batcher.is_done():
+
+      curReluDecay = float(50000 - step)/50000.
       batch_im, batch_labs = batcher.next_batch()
       feed_dict = {
           inputs['images_pl']: batch_im,
           inputs['labels_pl']: batch_labs,
+	  relu_decay: curReluDecay,
         }
 
       predictions = sess.run([top_k_op], feed_dict=feed_dict)
@@ -123,10 +130,19 @@ def evaluate():
     images = inputs['images']
     labels = inputs['labels']
 
+    ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+      # Assuming model_checkpoint_path looks something like:
+      #   /my-favorite-path/cifar10_train/model.ckpt-0,
+      # extract global_step from it.
+      global_step = int(ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1])
     # Build a Graph that computes the logits predictions from the
     # inference model.
+    numStepsLeft = global_step - 50000
+    decay = numStepsLeft/50000.
     logits = cifar10.inference(images, n, use_batchnorm=True, 
-        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=False)
+        use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=False, 
+	relu_decay=tf.nn.relu(decay))
 
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)

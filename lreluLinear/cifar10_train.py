@@ -71,7 +71,7 @@ def train():
     inputs = cifar10.ram_inputs(unit_variance=True, is_train=True)
     images = inputs['images']
     labels = inputs['labels']
-    relu_decay = tf.placeholder(tf.float32, shape = ())
+    relu_decay = tf.placeholder(tf.float32, ())
 
     # Batch generator
     batcher = cifar10.Cifar10BatchGenerator(
@@ -114,9 +114,9 @@ def train():
     summary_writer = tf.train.SummaryWriter(FLAGS.train_dir, sess.graph)
 
     step = -1
-    curReluDecay = float(50000 - step)/50000.
     while not batcher.is_done():
       step += 1
+      curReluDecay = float(50000 - step)/50000.
 
       batch_im, batch_labs = batcher.next_batch()
       feed_dict = {
