@@ -43,7 +43,7 @@ import tensorflow as tf
 
 import cifar10
 
-n = 5
+n = cifar10.n
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/eval-' + cifar10.name,
