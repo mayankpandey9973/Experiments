@@ -69,7 +69,7 @@ IMAGE_SIZE = cifar10_input.IMAGE_SIZE
 NUM_CLASSES = cifar10_input.NUM_CLASSES
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
 NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
-
+name = 'mixingNoAdd'
 
 # Constants describing the training process.
 MOVING_AVERAGE_DECAY = 0.0     # The decay to use for the moving average.
@@ -98,7 +98,7 @@ def mix(kernel1, kernel2, p1, p2, noise_shape = None, seed = None, name = None):
     random_tensor2 = p2 + random_ops.random_uniform(noise_shape, seed = seed, dtype = x.dtype)
     binary_tensor1 = math_ops.floor(random_tensor1)
     binary_tensor2 = math_ops,floor(random_tensor2) 
-    return binary_tensor1 * kernel1 + binary_tensor2 * kernel2
+    return binary_tensor1 * kernel1 + (1 - binary_tensor1) * kernel2
 
 
 def _activation_summary(x):
