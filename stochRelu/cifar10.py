@@ -59,7 +59,7 @@ import cifar10_input
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
-name = 'stochRelu'
+name = 'stochRelu0.1'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -80,7 +80,7 @@ LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
 group_shapes = [32, 32, 64, 128]
-curReluDecay = tf.ones(())
+
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
@@ -90,7 +90,7 @@ DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
 def modifiedRelu(x, decay):
     noise_shape = array_ops.shape(x)
-    theta = tf.floor(tf.minimum(tf.ones(noise_shape), tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+    theta = tf.floor(tf.minimum(tf.ones(noise_shape), 0.1 * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
     return theta * x
 
 def _activation_summary(x):
@@ -124,7 +124,6 @@ def _variable_on_cpu(name, shape, initializer):
   with tf.device('/cpu:0'):
     var = tf.get_variable(name, shape, initializer=initializer)
   return var
-
 
 def _variable_with_weight_decay(name, shape, stddev, wd):
   """Helper to create an initialized Variable with weight decay.
@@ -360,9 +359,6 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
     _activation_summary(res)
   return res
 
-def grpLoss(grp_id, scale):
-  mu = tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)
-  return scale * tf.nn.l2_loss(tf.get_collection('wts', 'grp' + str(grp_id)) - mu)
 
 
 def batchnorm(input, suffix, is_train):
@@ -526,9 +522,6 @@ def loss(logits, labels):
       logits, labels, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
   tf.add_to_collection('losses', cross_entropy_mean)
-  tf.add_to_collection('losses', grpLoss(1, SCALE))
-  tf.add_to_collection('losses', grpLoss(2, SCALE))
-  tf.add_to_collection('losses', grpLoss(3, SCALE))
 
   # The total loss is defined as the cross entropy loss plus all of the weight
   # decay terms (L2 loss).
