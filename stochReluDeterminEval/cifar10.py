@@ -59,7 +59,7 @@ import cifar10_input
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
-name = 'stochRelu1.0'
+name = 'stochRelu'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -88,17 +88,8 @@ TOWER_NAME = 'tower'
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
-def modifiedRelu(x, decay, is_train):
-    scale = 1.0
-    noise_shape = array_ops.shape(x)
-    pos = x * (tf.sign(x) + 1) * 0.5
-    neg = x - pos
-    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
-    if is_train:
-	return theta * neg + pos
-    else:
-	return pos + scale * neg * tf.min(tf.exp(neg), tf.ones(noise_shape))
-
+def modifiedRelu(x, decay):
+    return 0.5 * (tf.abs(x) + tf.abs(-x)) + 0.5 * (tf.abs(-x) - tf.abs(x)) * tf.exp(x) * x
 def _activation_summary(x):
   """Helper to create summaries for activations.
 
@@ -324,9 +315,9 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
     if use_nrelu:
-      groups_out = (modifiedRelu(groups_out, relu_decay, is_train) - relu_bias) / relu_std
+      groups_out = (modifiedRelu(groups_out, relu_decay) - relu_bias) / relu_std
     else:
-      groups_out = modifiedRelu(groups_out, relu_decay, is_train)
+      groups_out = modifiedRelu(groups_out, relu_decay)
     
     kernel = _variable_with_weight_decay('weights',
         shape=[1, 1, group_shapes[3], NUM_CLASSES], stddev=1e-4, 
@@ -428,9 +419,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
-      input = (modifiedRelu(input, cur_relu_decay, is_train) - relu_bias) / relu_std
+      input = (modifiedRelu(input, cur_relu_decay) - relu_bias) / relu_std
     else:
-      input = modifiedRelu(input, cur_relu_decay, is_train)
+      input = modifiedRelu(input, cur_relu_decay)
   wt_name = 'weights_1_' + str(suffix)
   if id_decay:
     kernel_[0] = _variable_with_id_decay(wt_name, shape=shape,
@@ -450,9 +441,9 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   if use_batchnorm:
     input = batchnorm(input, '2_' + str(suffix), is_train)
   if use_nrelu:
-    input = (modifiedRelu(bias, cur_relu_decay, is_train) - relu_bias) / relu_std
+    input = (modifiedRelu(bias, cur_relu_decay) - relu_bias) / relu_std
   else:
-    input = modifiedRelu(bias, cur_relu_decay, is_train)
+    input = modifiedRelu(bias, cur_relu_decay)
   
   # Upsampling (if needed) happens in the first conv block above.
   shape[2] = shape[3]
@@ -504,9 +495,9 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
   if use_nrelu:
-    conv1 = (modifiedRelu(conv1, cur_relu_decay, is_train) - relu_bias) / relu_std
+    conv1 = (modifiedRelu(conv1, cur_relu_decay) - relu_bias) / relu_std
   else:
-    conv1 = modifiedRelu(conv1, cur_relu_decay, is_train)
+    conv1 = modifiedRelu(conv1, cur_relu_decay)
 
   return conv1
 

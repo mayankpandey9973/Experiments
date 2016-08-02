@@ -1,0 +1,8 @@
+
+def modifiedRelu(x, decay):
+    noise_shape = array_ops.shape(x)
+    pos = x * (tf.sign(x) + 1) * 0.5
+    neg = x - pos
+    theta = tf.floor(tf.minimum(tf.ones(noise_shape), 2 * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+    return theta * neg + pos
+

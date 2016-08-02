@@ -47,7 +47,7 @@ import cifar10
 HOME = os.getenv("HOME")
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/eval-' + cifar10.name,
+tf.app.flags.DEFINE_string('eval_dir', '/home/mayankp/tfRuns/outputs/normalized_relu/tmp/eval-determ_' + cifar10.name,
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
@@ -70,7 +70,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
     top_k_op: Top K op.
     summary_op: Summary op.
   """
-  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.45)
+  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
 
   with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
     ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_dir)
@@ -107,7 +107,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
 
     # Compute precision @ 1.
     precision = true_count / batcher.num_samples()
-    print('%s: precision @ 1 = %.4f' % (datetime.now(), precision))
+    print('%s: precision @ 1 = %.3f' % (datetime.now(), precision))
 
     summary = tf.Summary()
     summary.ParseFromString(sess.run(summary_op, feed_dict=feed_dict))

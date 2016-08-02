@@ -59,7 +59,7 @@ import cifar10_input
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
-name = 'stochRelu1.0'
+name = 'stochReluLeak0.5'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -89,15 +89,15 @@ TOWER_NAME = 'tower'
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
 def modifiedRelu(x, decay, is_train):
-    scale = 1.0
+    scale = 0.5
     noise_shape = array_ops.shape(x)
-    pos = x * (tf.sign(x) + 1) * 0.5
-    neg = x - pos
+    pos = 0#x * (tf.sign(x) + 1) * 0.5
+    neg = x# - pos
     theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
     if is_train:
 	return theta * neg + pos
     else:
-	return pos + scale * neg * tf.min(tf.exp(neg), tf.ones(noise_shape))
+	return pos + scale * neg * tf.minimum(tf.exp(neg), 1 / scale * tf.ones(noise_shape))
 
 def _activation_summary(x):
   """Helper to create summaries for activations.
