@@ -45,14 +45,22 @@ import random as rand
 
 import numpy as np
 from six.moves import urllib
+
 import tensorflow as tf
+from tensorflow.python.framework import tensor_shape
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import common_shapes
+from tensorflow.python.ops import gen_nn_ops
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import random_ops
 
 import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
-name = 'reluDecayLinear'
+stochScale = 0.5
+name = 'stochRelu0.5'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -73,6 +81,7 @@ LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
 group_shapes = [32, 32, 64, 128]
+
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
@@ -80,8 +89,6 @@ TOWER_NAME = 'tower'
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
-def modifiedRelu(x, decay):
-    return decay * x + (1 - decay) * tf.nn.relu(x)
 
 def _activation_summary(x):
   """Helper to create summaries for activations.
@@ -114,7 +121,6 @@ def _variable_on_cpu(name, shape, initializer):
   with tf.device('/cpu:0'):
     var = tf.get_variable(name, shape, initializer=initializer)
   return var
-
 
 def _variable_with_weight_decay(name, shape, stddev, wd):
   """Helper to create an initialized Variable with weight decay.
@@ -253,6 +259,17 @@ def ram_inputs(unit_variance, is_train):
   return cifar10_input.ram_inputs(data_dir=FLAGS.data_dir,
       unit_variance=unit_variance, is_train=is_train)
 
+def modifiedRelu(x, decay, is_train, scale):
+#scale = 0.5
+    noise_shape = array_ops.shape(x)
+    pos = x * (tf.sign(x) + 1) * 0.5
+    neg = x - pos
+    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+    if is_train:
+	return theta * neg + pos
+    else:
+	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
+
 def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     is_train, relu_decay):
   """Build the CIFAR-10 model.
@@ -306,12 +323,14 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     relu_std = 0.584
     # Add bnorm and relu after the last grp.
     groups_out = res3
+    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', tf.Variable.get_shape(groups_out), 
+	    tf.constant_initializer(stochScale))
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
     if use_nrelu:
-      groups_out = (modifiedRelu(groups_out, relu_decay) - relu_bias) / relu_std
+      groups_out = (modifiedRelu(groups_out, relu_decay, is_train, relu_scale_groups_out) - relu_bias) / relu_std
     else:
-      groups_out = modifiedRelu(groups_out, relu_decay)
+      groups_out = modifiedRelu(groups_out, relu_decay, is_train, relu_scale_groups_out)
     
     kernel = _variable_with_weight_decay('weights',
         shape=[1, 1, group_shapes[3], NUM_CLASSES], stddev=1e-4, 
@@ -350,9 +369,6 @@ def addgroup(grp_id, input, group_shapes, weight_decay, is_train, num_blocks,
     _activation_summary(res)
   return res
 
-def grpLoss(grp_id, scale):
-  mu = tf.reduce_mean(tf.get_collection('wts', 'grp' + str(grp_id)), 0)
-  return scale * tf.nn.l2_loss(tf.get_collection('wts', 'grp' + str(grp_id)) - mu)
 
 
 def batchnorm(input, suffix, is_train):
@@ -413,12 +429,14 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     shortcut = tf.nn.conv2d(shortcut, kernel, [1, 1, 1, 1], padding='SAME')
 
   if not first:
+    stochRelu_scale1 = _variable_on_cpu('1_' + str(suffix) + '_relu_scale', tf.Variable.get_shape(input), 
+	    tf.constant_initializer(stochScale))
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
-      input = (modifiedRelu(input, cur_relu_decay) - relu_bias) / relu_std
+      input = (modifiedRelu(input, cur_relu_decay, is_train, stochRelu_scale1) - relu_bias) / relu_std
     else:
-      input = modifiedRelu(input, cur_relu_decay)
+      input = modifiedRelu(input, cur_relu_decay, is_train, stochRelu_scale1)
   wt_name = 'weights_1_' + str(suffix)
   if id_decay:
     kernel_[0] = _variable_with_id_decay(wt_name, shape=shape,
@@ -434,13 +452,15 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   bias = tf.nn.bias_add(conv, biases)
   #bias = conv
 
+  stochRelu_scale2 = _variable_on_cpu('2_' + str(suffix) + '_relu_scale', tf.Variable.get_shape(input), 
+	  tf.constant_initializer(stochScale))
   # Do batch norm as well
   if use_batchnorm:
     input = batchnorm(input, '2_' + str(suffix), is_train)
   if use_nrelu:
-    input = (modifiedRelu(bias, cur_relu_decay) - relu_bias) / relu_std
+    input = (modifiedRelu(bias, cur_relu_decay, is_train, stochRelu_scale2) - relu_bias) / relu_std
   else:
-    input = modifiedRelu(bias, cur_relu_decay)
+    input = modifiedRelu(bias, cur_relu_decay, is_train, stochRelu_scale2)
   
   # Upsampling (if needed) happens in the first conv block above.
   shape[2] = shape[3]
@@ -479,6 +499,8 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
   else:
     kernel = _variable_with_weight_decay(wt_name, shape=shape,
                                          stddev=1e-4, wd=weight_decay)
+  
+  
   conv = tf.nn.conv2d(input, kernel, [1, 1, 1, 1], padding='SAME')
   b_name = 'biases' + str(suffix)
   biases = _variable_on_cpu(b_name, shape[3], tf.constant_initializer(0.0))
@@ -489,12 +511,14 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
   relu_std = 0.584
 
   conv1 = bias
+  stochScale_conv = _variable_on_cpu('stoch_scale_conv' + str(suffix), tf.Variable.get_shape(conv1), 
+	  tf.constant_initializer(stochScale))
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
   if use_nrelu:
-    conv1 = (modifiedRelu(conv1, cur_relu_decay) - relu_bias) / relu_std
+    conv1 = (modifiedRelu(conv1, cur_relu_decay, is_train, stochScale_conv) - relu_bias) / relu_std
   else:
-    conv1 = modifiedRelu(conv1, cur_relu_decay)
+    conv1 = modifiedRelu(conv1, cur_relu_decay, is_train, stochScale_conv)
 
   return conv1
 
@@ -516,9 +540,6 @@ def loss(logits, labels):
       logits, labels, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
   tf.add_to_collection('losses', cross_entropy_mean)
-  tf.add_to_collection('losses', grpLoss(1, SCALE))
-  tf.add_to_collection('losses', grpLoss(2, SCALE))
-  tf.add_to_collection('losses', grpLoss(3, SCALE))
 
   # The total loss is defined as the cross entropy loss plus all of the weight
   # decay terms (L2 loss).
@@ -565,6 +586,7 @@ def train(total_loss, global_step):
   Returns:
     train_op: op for training.
   """
+  global curReluDecay
   # Variables that affect learning rate.
   num_batches_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN / FLAGS.batch_size
   decay_steps = int(num_batches_per_epoch * NUM_EPOCHS_PER_DECAY)
@@ -577,6 +599,7 @@ def train(total_loss, global_step):
                                   LEARNING_RATE_DECAY_FACTOR,
                                   staircase=True)
   
+  curReluDecay = tf.nn.relu(tf.to_float(50000 - global_step)/50000.)
   tf.scalar_summary('learning_rate', lr)
 #tf.scalar_summary('reluVal', modifiedRelu(-1.0))
 
