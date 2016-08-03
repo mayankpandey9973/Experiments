@@ -60,7 +60,7 @@ FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
 stochScale = 0.5
-name = 'stochRelu0.5'
+name = 'stochReluLearn0.5'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -260,6 +260,7 @@ def ram_inputs(unit_variance, is_train):
       unit_variance=unit_variance, is_train=is_train)
 
 def modifiedRelu(x, decay, is_train, scale):
+    _activation_summary(scale)
 #scale = 0.5
     noise_shape = array_ops.shape(x)
     pos = x * (tf.sign(x) + 1) * 0.5
@@ -323,8 +324,8 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     relu_std = 0.584
     # Add bnorm and relu after the last grp.
     groups_out = res3
-    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', tf.Variable.get_shape(groups_out), 
-	    tf.constant_initializer(stochScale))
+    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', [1, 8, 8, 128], 
+	    tf.random_normal_initializer(mean=stochScale, stddev=0.05))
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
     if use_nrelu:
@@ -429,8 +430,8 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
     shortcut = tf.nn.conv2d(shortcut, kernel, [1, 1, 1, 1], padding='SAME')
 
   if not first:
-    stochRelu_scale1 = _variable_on_cpu('1_' + str(suffix) + '_relu_scale', tf.Variable.get_shape(input), 
-	    tf.constant_initializer(stochScale))
+    stochRelu_scale1 = _variable_on_cpu('1_' + str(suffix) + '_relu_scale', shape[2], 
+	    tf.random_normal_initializer(mean=stochScale, stddev=0.05))
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
@@ -452,8 +453,8 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   bias = tf.nn.bias_add(conv, biases)
   #bias = conv
 
-  stochRelu_scale2 = _variable_on_cpu('2_' + str(suffix) + '_relu_scale', tf.Variable.get_shape(input), 
-	  tf.constant_initializer(stochScale))
+  stochRelu_scale2 = _variable_on_cpu('2_' + str(suffix) + '_relu_scale', shape[3], 
+	  tf.random_normal_initializer(mean=stochScale, stddev=0.05))
   # Do batch norm as well
   if use_batchnorm:
     input = batchnorm(input, '2_' + str(suffix), is_train)
@@ -511,8 +512,8 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
   relu_std = 0.584
 
   conv1 = bias
-  stochScale_conv = _variable_on_cpu('stoch_scale_conv' + str(suffix), tf.Variable.get_shape(conv1), 
-	  tf.constant_initializer(stochScale))
+  stochScale_conv = _variable_on_cpu('stoch_scale_conv' + str(suffix), shape[3], 
+	  tf.random_normal_initializer(mean=stochScale, stddev=0.05))
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
   if use_nrelu:
