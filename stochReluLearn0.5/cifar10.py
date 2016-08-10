@@ -259,17 +259,31 @@ def ram_inputs(unit_variance, is_train):
   return cifar10_input.ram_inputs(data_dir=FLAGS.data_dir,
       unit_variance=unit_variance, is_train=is_train)
 
+def modifiedRelu_train(x, scale):
+    noise_shape = array_ops.shape(x)
+    pos = tf.nn.relu(x)
+    neg = x - pos
+    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+    return theta * neg + pos
+
+def modifiedRelu_notrain(x, scale):
+    return tf.nn.relu(x) + scale * (x - tf.nn.relu(x)) * tf.minimum(tf.exp(x - tf.nn.relu(x)), tf.ones(array_ops.shape(x)))
+
 def modifiedRelu(x, decay, is_train, scale):
     _activation_summary(scale)
 #scale = 0.5
-    noise_shape = array_ops.shape(x)
-    pos = x * (tf.sign(x) + 1) * 0.5
-    neg = x - pos
-    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+#    noise_shape = array_ops.shape(x)
+#    pos = x * (tf.sign(x) + 1) * 0.5
+#    neg = x - pos
+#    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+#    if is_train:
+#	return theta * neg + pos
+#    else:
+#	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
     if is_train:
-	return theta * neg + pos
+	return modifiedRelu_notrain(x, scale) + tf.stop_gradient(modifiedRelu_train(x, scale) - modifiedRelu_notrain(x, scale))
     else:
-	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
+	return modifiedRelu_notrain(x, scale)
 
 def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     is_train, relu_decay):
