@@ -130,7 +130,12 @@ def train():
 
       duration = time.time() - start_time
 
-      assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
+      if np.isnan(loss_value):
+	 print('Model diverged with loss = NaN')
+	 summary_str = sess.run(summary_op, feed_dict=feed_dict)
+	 summary_writer.add_summary(summary_str, step)
+	 assert False 
+    
 
       if step % 10 == 0:
         num_examples_per_step = FLAGS.batch_size

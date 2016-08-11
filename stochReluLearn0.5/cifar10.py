@@ -41,6 +41,7 @@ import re
 import sys
 import tarfile
 import pdb
+import math
 import random as rand
 
 import numpy as np
@@ -281,7 +282,8 @@ def modifiedRelu(x, decay, is_train, scale):
 #    else:
 #	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
     if is_train:
-	return modifiedRelu_notrain(x, scale) + tf.stop_gradient(modifiedRelu_train(x, scale) - modifiedRelu_notrain(x, scale))
+	t = modifiedRelu_notrain(x, scale) 
+	return t + tf.stop_gradient(modifiedRelu_train(x, scale) - t)
     else:
 	return modifiedRelu_notrain(x, scale)
 
