@@ -61,7 +61,7 @@ FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
 stochScale = 0.5
-name = 'stochReluLearn0.5'
+name = 'stochReluLearnRestrict0.5_56'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -281,7 +281,7 @@ def modifiedRelu(x, decay, is_train, scale):
 #	return theta * neg + pos
 #    else:
 #	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
-    scale1 = scale#stochScale + 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi
+    scale1 = stochScale + 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi
     if is_train:
 	t = modifiedRelu_notrain(x, scale1) 
 	return t + tf.stop_gradient(modifiedRelu_train(x, scale1) - t)

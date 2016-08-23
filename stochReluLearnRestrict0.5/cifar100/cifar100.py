@@ -55,24 +55,24 @@ from tensorflow.python.ops import gen_nn_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import random_ops
 
-import cifar10_input
+import cifar100_input
 
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
 stochScale = 0.5
-name = 'stochReluLearn0.5'
+name = 'CIFAR-100_stochReluLearnRestrict0.5_Wx4'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar10_data',
-                           """Path to the CIFAR-10 data directory.""")
+tf.app.flags.DEFINE_string('data_dir', '/home/mayankp/tmp/cifar100_data',
+                           """Path to the CIFAR-100 data directory.""")
 
 # Global constants describing the CIFAR-10 data set.
-IMAGE_SIZE = cifar10_input.IMAGE_SIZE
-NUM_CLASSES = cifar10_input.NUM_CLASSES
-NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
-NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+IMAGE_SIZE = cifar100_input.IMAGE_SIZE
+NUM_CLASSES = cifar100_input.NUM_CLASSES
+NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar100_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
+NUM_EXAMPLES_PER_EPOCH_FOR_EVAL = cifar100_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
 
 # Constants describing the training process.
@@ -81,15 +81,13 @@ NUM_EPOCHS_PER_DECAY = 128.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
-group_shapes = [32, 32, 64, 128]
 
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
 # names of the summaries when visualizing a model.
 TOWER_NAME = 'tower'
 
-DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
-
+DATA_URL = '//www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz'#'http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
 
 def _activation_summary(x):
   """Helper to create summaries for activations.
@@ -215,7 +213,7 @@ def distorted_inputs():
   if not FLAGS.data_dir:
     raise ValueError('Please supply a data_dir')
   data_dir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin')
-  return cifar10_input.distorted_inputs(data_dir=data_dir,
+  return cifar100_input.distorted_inputs(data_dir=data_dir,
                                         batch_size=FLAGS.batch_size)
 
 def standard_distorted_inputs():
@@ -231,7 +229,7 @@ def standard_distorted_inputs():
   if not FLAGS.data_dir:
     raise ValueError('Please supply a data_dir')
   data_dir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin')
-  return cifar10_input.standard_distorted_inputs(data_dir=data_dir,
+  return cifar100_input.standard_distorted_inputs(data_dir=data_dir,
                                         batch_size=FLAGS.batch_size)
 
 def inputs(eval_data):
@@ -250,14 +248,14 @@ def inputs(eval_data):
   if not FLAGS.data_dir:
     raise ValueError('Please supply a data_dir')
   data_dir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin')
-  return cifar10_input.inputs(eval_data=eval_data, data_dir=data_dir,
+  return cifar100_input.inputs(eval_data=eval_data, data_dir=data_dir,
                               batch_size=FLAGS.batch_size)
 
 def ram_inputs(unit_variance, is_train):
   if not FLAGS.data_dir:
     raise ValueError('Please supply a data_dir')
   data_dir = os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin')
-  return cifar10_input.ram_inputs(data_dir=FLAGS.data_dir,
+  return cifar100_input.ram_inputs(data_dir=FLAGS.data_dir,
       unit_variance=unit_variance, is_train=is_train)
 
 def modifiedRelu_train(x, scale):
@@ -281,7 +279,7 @@ def modifiedRelu(x, decay, is_train, scale):
 #	return theta * neg + pos
 #    else:
 #	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
-    scale1 = scale#stochScale + 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi
+    scale1 = stochScale + 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi
     if is_train:
 	t = modifiedRelu_notrain(x, scale1) 
 	return t + tf.stop_gradient(modifiedRelu_train(x, scale1) - t)
@@ -306,6 +304,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
 
   # Weight decay
   weight_decay = WEIGHT_DECAY
+  group_shapes =  [32, 2 * 32, 2 * 64, 2 * 128]
   tf.scalar_summary('relu_decay', relu_decay)
 #relu_decay = tf.placeholder(tf.float32, shape = ())
   # Initial conv block
@@ -341,7 +340,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     relu_std = 0.584
     # Add bnorm and relu after the last grp.
     groups_out = res3
-    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', [1, 8, 8, 128], 
+    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', [1, 8, 8, group_shapes[3]], 
 	    tf.random_normal_initializer(mean=stochScale, stddev=0.05))
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
@@ -659,6 +658,7 @@ def maybe_download_and_extract():
   if not os.path.exists(dest_directory):
     os.makedirs(dest_directory)
   filename = DATA_URL.split('/')[-1]
+  print('Filename: ', filename)
   filepath = os.path.join(dest_directory, filename)
   if not os.path.exists(filepath):
     def _progress(count, block_size, total_size):
@@ -673,10 +673,10 @@ def maybe_download_and_extract():
 
 def get_max_steps(is_train, num_epochs):
   if is_train:
-    max_steps = (cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN 
+    max_steps = (cifar100_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN 
         * num_epochs) / float(FLAGS.batch_size)
   else:
-    max_steps = (cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
+    max_steps = (cifar100_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
         * num_epochs) / float(FLAGS.batch_size)
   
   return int(np.ceil(max_steps))

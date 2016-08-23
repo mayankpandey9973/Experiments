@@ -61,7 +61,7 @@ FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
 stochScale = 0.5
-name = 'stochReluLearn0.5'
+name = 'stochReluLearnRestrict0.5_Wx4'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -81,7 +81,6 @@ NUM_EPOCHS_PER_DECAY = 128.0      # Epochs after which learning rate decays.
 LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 WEIGHT_DECAY = 0.0001
-group_shapes = [32, 32, 64, 128]
 
 # If a model is trained with multiple GPUs, prefix all Op names with tower_name
 # to differentiate the operations. Note that this prefix is removed from the
@@ -281,8 +280,8 @@ def modifiedRelu(x, decay, is_train, scale):
 #	return theta * neg + pos
 #    else:
 #	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
-    scale1 = scale#stochScale + 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi
-    if is_train:
+    scale1 = stochScale + 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi
+    if True or is_train:
 	t = modifiedRelu_notrain(x, scale1) 
 	return t + tf.stop_gradient(modifiedRelu_train(x, scale1) - t)
     else:
@@ -306,6 +305,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
 
   # Weight decay
   weight_decay = WEIGHT_DECAY
+  group_shapes =  [32, 2 * 32, 2 * 64, 2 * 128]
   tf.scalar_summary('relu_decay', relu_decay)
 #relu_decay = tf.placeholder(tf.float32, shape = ())
   # Initial conv block
@@ -341,7 +341,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     relu_std = 0.584
     # Add bnorm and relu after the last grp.
     groups_out = res3
-    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', [1, 8, 8, 128], 
+    relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', [1, 8, 8, group_shapes[3]], 
 	    tf.random_normal_initializer(mean=stochScale, stddev=0.05))
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
