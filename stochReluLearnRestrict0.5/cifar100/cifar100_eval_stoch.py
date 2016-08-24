@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Evaluation for CIFAR-10.
+"""Evaluation for CIFAR-100.
 
 Accuracy:
 cifar100_train.py achieves 83.0% accuracy after 100K steps (256 epochs
@@ -61,7 +61,7 @@ tf.app.flags.DEFINE_boolean('run_once', False,
                          """Whether to run eval only once.""")
 n = 5
 
-def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
+def eval_once(saver, summary_writer, top_k_op, summary_op, inputs, logitsArr, labels, logitsAct):
   """Run Eval once.
 
   Args:
@@ -102,20 +102,32 @@ def eval_once(saver, summary_writer, top_k_op, summary_op, inputs):
           inputs['labels_pl']: batch_labs,
         }
 
-      sumPred = np.array(sess.run([top_k_op], feed_dict=feed_dict), dtype = float)
-      for i in range(1, 30):
-	  sumPred += np.array(sess.run([top_k_op], feed_dict=feed_dict), dtype = float)
+      probs = np.array(sess.run([logitsAct], feed_dict=feed_dict), dtype = float) * 0.0
+      softmax = tf.nn.softmax(logitsAct)
+      for i in range(30):
+#logits = logitsArr[i]
+	  probs += np.array(sess.run([softmax], feed_dict=feed_dict), dtype = float)
+      tmp = np.sum(sess.run([tf.nn.in_top_k(probs[0], labels, 1)], feed_dict=feed_dict))
+
+      true_count += tmp
+#      print(np.sum(probs))
+#print(tmp)
+
+#      sumPred = np.array(sess.run([top_k_op], feed_dict=feed_dict), dtype = float)
+#      for i in range(1, 30):
+#	  sumPred += np.array(sess.run([top_k_op], feed_dict=feed_dict), dtype = float)
 #sumPred = 1 / 30 * sumPred
 #print(sumPred)
 #sumPred = np.floor(sumPred + 0.5)
 #print(np.average(sumPred))
 #predictions = sess.run([top_k_op], feed_dict=feed_dict) 
-      true_count += np.sum(sumPred)
+#true_count += np.sum(sumPred)
+
       step += 1
       
 
     # Compute precision @ 1.
-    precision = true_count / (30 * batcher.num_samples())
+    precision = true_count / (batcher.num_samples())
     print('%s: precision @ 1 = %.4f' % (datetime.now(), precision))
 
     summary = tf.Summary()
@@ -138,6 +150,10 @@ def evaluate():
     relu_decay = 0.0
     logits = cifar100.inference(images, n, use_batchnorm=True,
         use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=True, relu_decay=relu_decay)
+    logitsArr = []
+
+#for i  in range(30):
+#logitsArr.append(cifar100.inference(images, n, use_batchnorm=True, use_nrelu=False, id_decay=False, add_shortcuts=True, is_train=True, relu_decay=relu_decay))
 
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)
@@ -154,7 +170,7 @@ def evaluate():
     summary_writer = tf.train.SummaryWriter(FLAGS.eval_dir, g)
 
     while True:
-      eval_once(saver, summary_writer, top_k_op, summary_op, inputs)
+      eval_once(saver, summary_writer, top_k_op, summary_op, inputs, logitsArr, labels, logits)
       if FLAGS.run_once:
         break
       time.sleep(FLAGS.eval_interval_secs)
