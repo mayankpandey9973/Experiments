@@ -60,8 +60,8 @@ import cifar100_input
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
-stochScale = 0.5
-name = 'CIFAR-100_stochReluLearnRestrict0.5_Wx4'
+stochScale = math.sqrt(0.5)
+name = 'CIFAR-100_quad_rt2'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -258,15 +258,18 @@ def ram_inputs(unit_variance, is_train):
   return cifar100_input.ram_inputs(data_dir=FLAGS.data_dir,
       unit_variance=unit_variance, is_train=is_train)
 
+def mreluDecayFunc(x):
+    return 1/(x*x + 1)
+
 def modifiedRelu_train(x, scale):
     noise_shape = array_ops.shape(x)
     pos = tf.nn.relu(x)
     neg = x - pos
-    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * tf.exp(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
+    theta = tf.floor(tf.minimum(tf.ones(noise_shape), scale * mreluDecayFunc(x)) + tf.random_uniform(noise_shape, maxval = 1.0))
     return theta * neg + pos
 
 def modifiedRelu_notrain(x, scale):
-    return tf.nn.relu(x) + scale * (x - tf.nn.relu(x)) * tf.minimum(tf.exp(x - tf.nn.relu(x)), tf.ones(array_ops.shape(x)))
+    return tf.nn.relu(x) + scale * (x - tf.nn.relu(x)) * tf.minimum(mreluDecayFunc(x - tf.nn.relu(x)), tf.ones(array_ops.shape(x)))
 
 def modifiedRelu(x, decay, is_train, scale):
 #scale = 0.5
@@ -278,8 +281,8 @@ def modifiedRelu(x, decay, is_train, scale):
 #	return theta * neg + pos
 #    else:
 #	return pos + scale * neg * tf.minimum(tf.exp(neg), tf.ones(noise_shape))
-    scale1 = tf.add(stochScale, 0.5 * 2 * tf.tanh(scale - stochScale) / math.pi, name = '_restrict')
-    _activation_summary(scale)
+    scale1 = tf.add(stochScale, 0.5 * tf.tanh(scale - stochScale))
+    _activation_summary(scale1)
     if is_train:
 	t = modifiedRelu_notrain(x, scale1) 
 	return t + tf.stop_gradient(modifiedRelu_train(x, scale1) - t)
