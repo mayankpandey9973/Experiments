@@ -60,8 +60,8 @@ import cifar100_input
 FLAGS = tf.app.flags.FLAGS
 
 SCALE = 0.0 #not relevant here
-stochScale = 2.0
-name = 'CIFAR-100_expScale_scaleLR_2'
+stochScale = 1.5
+name = 'CIFAR-100_absScale_1.5'
 # Basic model parameters.
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
@@ -106,7 +106,7 @@ def _activation_summary(x):
   tf.histogram_summary(tensor_name + '/activations', x)
   tf.scalar_summary(tensor_name + '/sparsity', tf.nn.zero_fraction(x))
 
-def _variable_on_cpu(name, shape, initializer, scale = False):
+def _variable_on_cpu(name, shape, initializer):
   """Helper to create a Variable stored on CPU memory.
 
   Args:
@@ -118,10 +118,10 @@ def _variable_on_cpu(name, shape, initializer, scale = False):
     Variable Tensor
   """
   with tf.device('/cpu:0'):
-    var = tf.get_variable(name, shape, initializer=initializer, trainable = (not scale))
+    var = tf.get_variable(name, shape, initializer=initializer)
   return var
 
-def _variable_with_weight_decay(name, shape, stddev, wd, scale = False):
+def _variable_with_weight_decay(name, shape, stddev, wd):
   """Helper to create an initialized Variable with weight decay.
 
   Note that the Variable is initialized with a truncated normal distribution.
@@ -259,7 +259,7 @@ def ram_inputs(unit_variance, is_train):
       unit_variance=unit_variance, is_train=is_train)
 
 def mreluDecayFunc(x, scale):
-    return tf.exp(x * scale)
+    return 1/(tf.exp(scale * tf.log(tf.abs(x) + 1e-9)) + 1)
 
 def modifiedRelu_train(x, scale):
     noise_shape = array_ops.shape(x)
@@ -344,8 +344,7 @@ def inference(images, n, use_batchnorm, use_nrelu, id_decay, add_shortcuts,
     # Add bnorm and relu after the last grp.
     groups_out = res3
     relu_scale_groups_out = _variable_on_cpu('relu_scale_groups_out', [1, 8, 8, group_shapes[3]], 
-	    tf.random_normal_initializer(mean=stochScale, stddev=0.05), scale = True)
-    tf.add_to_collection('relu_scales', relu_scale_groups_out)
+	    tf.random_normal_initializer(mean=stochScale, stddev=0.05))
     if use_batchnorm:
       groups_out = batchnorm(groups_out, '1', is_train)
     if use_nrelu:
@@ -451,8 +450,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
 
   if not first:
     stochRelu_scale1 = _variable_on_cpu('1_' + str(suffix) + '_relu_scale', shape[2], 
-	    tf.random_normal_initializer(mean=stochScale, stddev=0.05), scale = True)
-    tf.add_to_collection('relu_scales', stochRelu_scale1)
+	    tf.random_normal_initializer(mean=stochScale, stddev=0.05))
     if use_batchnorm:
       input = batchnorm(input, '1_' + str(suffix), is_train)
     if use_nrelu:
@@ -475,8 +473,7 @@ def residualblock(input, shape, suffix, first, weight_decay, use_batchnorm,
   #bias = conv
 
   stochRelu_scale2 = _variable_on_cpu('2_' + str(suffix) + '_relu_scale', shape[3], 
-	  tf.random_normal_initializer(mean=stochScale, stddev=0.05), scale = True)
-  tf.add_to_collection('relu_scales', stochRelu_scale2)
+	  tf.random_normal_initializer(mean=stochScale, stddev=0.05))
   # Do batch norm as well
   if use_batchnorm:
     input = batchnorm(input, '2_' + str(suffix), is_train)
@@ -535,8 +532,7 @@ def convblock(input, shape, suffix, weight_decay, use_batchnorm,
 
   conv1 = bias
   stochScale_conv = _variable_on_cpu('stoch_scale_conv' + str(suffix), shape[3], 
-	  tf.random_normal_initializer(mean=stochScale, stddev=0.05), scale = True)
-  tf.add_to_collection('relu_scales', stochScale_conv)
+	  tf.random_normal_initializer(mean=stochScale, stddev=0.05))
   if use_batchnorm:
     conv1 = batchnorm(conv1, suffix, is_train)
   if use_nrelu:
@@ -619,7 +615,7 @@ def train(total_loss, global_step):
   # Decay the learning rate exponentially based on the number of steps.
   lr = tf.train.exponential_decay(INITIAL_LEARNING_RATE,
                                   global_step,
-                                  64000,
+                                  decay_steps,
                                   LEARNING_RATE_DECAY_FACTOR,
                                   staircase=True)
   
@@ -632,26 +628,12 @@ def train(total_loss, global_step):
 
   # Compute gradients.
   with tf.control_dependencies([loss_averages_op]):
-    opt1 = tf.train.MomentumOptimizer(lr, 0.9)
-    opt2 = tf.train.MomentumOptimizer(0.1 * lr, 0.9)
+    opt = tf.train.MomentumOptimizer(lr, 0.9)
     # opt = tf.train.AdamOptimizer(lr)
-    grads = opt1.compute_gradients(total_loss, var_list = tf.trainable_variables())
-
-    var_list_slow = tf.get_collection('relu_scales', 'conv0') + tf.get_collection('relu_scales', 'grp1') + tf.get_collection('relu_scales', 'grp2') + tf.get_collection('relu_scales', 'grp3') + tf.get_collection('relu_scales', 'softmax_linear')
-
-    gradsConv0 = opt2.compute_gradients(total_loss, var_list = var_list_slow)
-#    gradsGrp1 = opt2.compute_gradients(total_loss, var_list = tf.get_collection('relu_scales', 'grp1'))
-#    gradsGrp2 = opt2.compute_gradients(total_loss, var_list = tf.get_collection('relu_scales', 'grp2'))
-#    gradsGrp3 = opt2.compute_gradients(total_loss, var_list = tf.get_collection('relu_scales', 'grp3'))
-#    gradsSoftmax_Linear = opt2.compute_gradients(total_loss, var_list = tf.get_collection('relu_scales', 'softmax_linear'))
+    grads = opt.compute_gradients(total_loss)
 
   # Apply gradients.
-  apply_gradient_op = opt1.apply_gradients(grads, global_step=global_step)
-  apply_gradient_opConv0 = opt2.apply_gradients(gradsConv0, global_step=global_step)
-#apply_gradient_opGrp1 = opt2.apply_gradients(gradsGrp1, global_step=global_step)
-#apply_gradient_opGrp2 = opt2.apply_gradients(gradsGrp2, global_step=global_step)
-#apply_gradient_opGrp3 = opt2.apply_gradients(gradsGrp3, global_step=global_step)
-#apply_gradient_opSoftmax_Linear = opt2.apply_gradients(gradsSoftmax_Linear, global_step=global_step)
+  apply_gradient_op = opt.apply_gradients(grads, global_step=global_step)
 
   # Add histograms for trainable variables.
   for var in tf.trainable_variables():
@@ -665,12 +647,9 @@ def train(total_loss, global_step):
   # Track the moving averages of all trainable variables.
   variable_averages = tf.train.ExponentialMovingAverage(
       MOVING_AVERAGE_DECAY, global_step)
-  variables_averages_op = variable_averages.apply(tf.trainable_variables() + var_list_slow)
-  
+  variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
-  with tf.control_dependencies([apply_gradient_op, apply_gradient_opConv0, variables_averages_op]):
-#  with tf.control_dependencies([apply_gradient_op, apply_gradient_opConv0, apply_gradient_opGrp1, 
-#apply_gradient_opGrp2, apply_gradient_opGrp3, apply_gradient_opSoftmax_Linear, variables_averages_op]):
+  with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
     train_op = tf.no_op(name='train')
 
   return train_op
